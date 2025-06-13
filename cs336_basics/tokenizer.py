@@ -12,8 +12,7 @@ def train_bpe(
     special_tokens: list[str],
     **kwargs,
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
-
-    special_tokens = list(set(special_tokens + ["<|endoftext|>"])) # ensure endoftext is present
+    special_tokens = list(set(special_tokens + ["<|endoftext|>"]))  # ensure endoftext is present
 
     min_vocab_size = 256 + len(special_tokens)
     if vocab_size < min_vocab_size:
@@ -26,7 +25,7 @@ def train_bpe(
     tok2id = {tok: idx for idx, tok in id2tok.items()}
 
     # print("vocab_initial", id2tok)
-    initial_vocab_size = len(id2tok) # 256 + len(special_tokens)
+    initial_vocab_size = len(id2tok)  # 256 + len(special_tokens)
 
     # TODO: parallelize once working
     with open(input_path, encoding="utf-8") as f:
@@ -40,7 +39,7 @@ def train_bpe(
             if not word:  # empty split piece → ignore
                 continue
             if word in special_tokens:
-                yield [tok2id[bytes([b])] for b in word.encode()]
+                yield [tok2id[word.encode("utf-8")]]
             else:
                 for m in PAT_RE.finditer(word):
                     word_bytes = m.group().encode("utf-8")
@@ -63,7 +62,13 @@ def train_bpe(
         # Get all pairs with max count
         max_pairs = [pair for pair, count in stats.items() if count == max_count]
         # Among ties, pick the lexicographically greatest
-        top_pair = max(max_pairs, key=lambda pair: (id2tok[pair[0]].decode(encoding="utf-8", errors="ignore"), id2tok[pair[1]].decode(encoding="utf-8", errors="ignore")))
+        top_pair = max(
+            max_pairs,
+            key=lambda pair: (
+                id2tok[pair[0]].decode(encoding="utf-8", errors="ignore"),
+                id2tok[pair[1]].decode(encoding="utf-8", errors="ignore"),
+            ),
+        )
 
         # merge
         new_token_idx = initial_vocab_size + i
@@ -88,4 +93,3 @@ def train_bpe(
         token_chunks = new_token_chunks
 
     return id2tok, list(merges)
-
