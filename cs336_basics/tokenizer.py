@@ -20,17 +20,13 @@ def train_bpe(
 
     num_merges = vocab_size - min_vocab_size
 
+    # base vocab
     id2tok = {i: s.encode() for i, s in enumerate(special_tokens)}
     id2tok |= {len(special_tokens) + i: bytes([i]) for i in range(256)}
     tok2id = {tok: idx for idx, tok in id2tok.items()}
-
-    # print("vocab_initial", id2tok)
     initial_vocab_size = len(id2tok)  # 256 + len(special_tokens)
 
-    # TODO: parallelize once working
-    with open(input_path, encoding="utf-8") as f:
-        text = f.read()
-
+    # iterator over tokenized words
     escaped_specials = sorted((re.escape(t) for t in special_tokens), key=len, reverse=True)
     special_token_split_re = re.compile(f"({'|'.join(escaped_specials)})")
 
@@ -45,7 +41,17 @@ def train_bpe(
                     word_bytes = m.group().encode("utf-8")
                     yield [tok2id[bytes([b])] for b in word_bytes]
 
-    # todo no, wait.. this will allow merges across pre-tokenized boundaries, it needs to be list[list[int]]
+    # TODO: parallelize once working
+    with open(input_path, encoding="utf-8") as f:
+        text = f.read()
+
+    # num_processes = os.cpu_count() or 4
+    # with open(input_path, "rb") as f:
+    #     boundaries = find_chunk_boundaries(f, num_processes, "<|endoftext|>".encode("utf-8"))
+    #     for start, end in zip(boundaries[:-1], boundaries[1:]):
+    #         f.seek(start)
+    #         chunk = f.read(end - start).decode("utf-8", errors="ignore")
+    #
     token_chunks: list[list[int]] = list(tokenize_chunk_iter(text))
 
     merges: list[tuple[bytes, bytes]] = []
@@ -64,10 +70,7 @@ def train_bpe(
         # Among ties, pick the lexicographically greatest
         top_pair = max(
             max_pairs,
-            key=lambda pair: (
-                id2tok[pair[0]].decode(encoding="utf-8", errors="ignore"),
-                id2tok[pair[1]].decode(encoding="utf-8", errors="ignore"),
-            ),
+            key=lambda pair: (id2tok[pair[0]], id2tok[pair[1]]),
         )
 
         # merge
