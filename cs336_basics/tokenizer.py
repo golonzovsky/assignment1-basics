@@ -18,13 +18,9 @@ def train_bpe(
     if vocab_size < min_vocab_size:
         raise ValueError(f"vocab_size must be at least {min_vocab_size}, got {vocab_size}")
 
-    num_merges = vocab_size - min_vocab_size
-
     # base vocab
-    id2tok = {i: s.encode() for i, s in enumerate(special_tokens)}
-    id2tok |= {len(special_tokens) + i: bytes([i]) for i in range(256)}
-    tok2id = {tok: idx for idx, tok in id2tok.items()}
-    initial_vocab_size = len(id2tok)  # 256 + len(special_tokens)
+    id2tok = [s.encode() for s in special_tokens] + [bytes([i]) for i in range(256)]
+    tok2id = {tok: idx for idx, tok in enumerate(id2tok)}
 
     # iterator over tokenized words
     escaped_specials = sorted((re.escape(t) for t in special_tokens), key=len, reverse=True)
@@ -46,8 +42,7 @@ def train_bpe(
     #         chunk = f.read(end - start).decode("utf-8", errors="ignore")
     #
 
-    # pre-tokens with counts
-    # word_counts: dict[bytes, int] =
+    # count pre-tokens
     word_counts = Counter(pre_tokenize(text))
 
     words_tokenized = []
@@ -59,17 +54,16 @@ def train_bpe(
 
     merges: list[tuple[bytes, bytes]] = []
 
-    for i in range(num_merges):
+    while len(id2tok) < vocab_size:
         # TODO: count once and update in-place during merge 0 -1 (old) -1 0 => 0 1 1 0
         # TODO: on the parallel - collect Δs and merge
-        stats = Counter()
+        pair_stats = Counter()
         for chunk, count in zip(words_tokenized, counts):
             for j in range(len(chunk) - 1):
                 pair = (chunk[j], chunk[j + 1])
-                stats[pair] += count
-        max_count = max(stats.values())
-        # Get all pairs with max count
-        max_pairs = [pair for pair, count in stats.items() if count == max_count]
+                pair_stats[pair] += count
+        max_count = max(pair_stats.values())
+        max_pairs = [pair for pair, count in pair_stats.items() if count == max_count]
         # Among ties, pick the lexicographically greatest
         top_pair = max(
             max_pairs,
@@ -77,10 +71,10 @@ def train_bpe(
         )
 
         # merge
-        new_token_idx = initial_vocab_size + i
+        new_token_idx = len(id2tok)
         pair_bytes = (id2tok[top_pair[0]], id2tok[top_pair[1]])
         merges.append(pair_bytes)
-        id2tok[new_token_idx] = pair_bytes[0] + pair_bytes[1]
+        id2tok.append(pair_bytes[0] + pair_bytes[1])
         print(f"merging {new_token_idx}: pair:{pair_bytes}->{pair_bytes[0] + pair_bytes[1]} count:{max_count}")
 
         new_token_chunks = []
@@ -98,4 +92,4 @@ def train_bpe(
 
         words_tokenized = new_token_chunks
 
-    return id2tok, list(merges)
+    return {i: t for i, t in enumerate(id2tok)}, list(merges)
