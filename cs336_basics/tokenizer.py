@@ -54,15 +54,19 @@ def train_bpe(
 
     merges: list[tuple[bytes, bytes]] = []
 
+    # count pair stats once and update in place during merge
+    pair_stats = Counter()
+    for chunk, count in zip(words_tokenized, counts):
+        for j in range(len(chunk) - 1):
+            pair = (chunk[j], chunk[j + 1])
+            pair_stats[pair] += count
+
     while len(id2tok) < vocab_size:
-        # TODO: count once and update in-place during merge 0 -1 (old) -1 0 => 0 1 1 0
         # TODO: on the parallel - collect Δs and merge
-        pair_stats = Counter()
-        for chunk, count in zip(words_tokenized, counts):
-            for j in range(len(chunk) - 1):
-                pair = (chunk[j], chunk[j + 1])
-                pair_stats[pair] += count
+        # TODO: use some sorted queue datastructure instead of finding max every time
         max_count = max(pair_stats.values())
+        if max_count < 0:
+            break
         max_pairs = [pair for pair, count in pair_stats.items() if count == max_count]
         # Among ties, pick the lexicographically greatest
         top_pair = max(
@@ -71,25 +75,43 @@ def train_bpe(
         )
 
         # merge
-        new_token_idx = len(id2tok)
         pair_bytes = (id2tok[top_pair[0]], id2tok[top_pair[1]])
         merges.append(pair_bytes)
+        new_token_idx = len(id2tok)
         id2tok.append(pair_bytes[0] + pair_bytes[1])
-        print(f"merging {new_token_idx}: pair:{pair_bytes}->{pair_bytes[0] + pair_bytes[1]} count:{max_count}")
+        del pair_stats[top_pair]  # clear stat for merged token
 
-        new_token_chunks = []
-        for chunk in words_tokenized:
+        # print(f"merging {new_token_idx}: pair:{pair_bytes}->{pair_bytes[0] + pair_bytes[1]} count:{max_count}")
+
+        for index, chunk in enumerate(words_tokenized):
             new_chunk = []
             j = 0
             while j < len(chunk):
                 if j < len(chunk) - 1 and (chunk[j], chunk[j + 1]) == top_pair:
                     new_chunk.append(new_token_idx)
+                    old_idx_left = j
+                    old_idx_right = j + 1
                     j += 2
+
+                    # update stats
+                    c = counts[index]
+                    if len(chunk) > 2:
+                        if old_idx_left == 0 and old_idx_right < len(chunk) - 1: # start of 3+
+                            pair_stats[(chunk[old_idx_right], chunk[old_idx_right + 1])] -= c
+                            pair_stats[(new_token_idx, chunk[old_idx_right + 1])] += c
+                        elif old_idx_right == len(chunk) - 1: # end
+                            pair_stats[(chunk[old_idx_left - 1], chunk[old_idx_left])] -= c
+                            pair_stats[(chunk[old_idx_left - 1], new_token_idx)] += c
+                        else: # middle
+                            pair_stats[(chunk[old_idx_right], chunk[old_idx_right + 1])] -= c
+                            pair_stats[(new_token_idx, chunk[old_idx_right + 1])] += c
+                            pair_stats[(chunk[old_idx_left - 1], chunk[old_idx_left])] -= c
+                            pair_stats[(chunk[old_idx_left - 1], new_token_idx)] += c
+
                 else:
                     new_chunk.append(chunk[j])
                     j += 1
-            new_token_chunks.append(new_chunk)
+            words_tokenized[index] = new_chunk
 
-        words_tokenized = new_token_chunks
 
     return {i: t for i, t in enumerate(id2tok)}, list(merges)
