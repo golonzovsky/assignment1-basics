@@ -28,23 +28,16 @@ def train_bpe(
 
     # iterator over tokenized words
     escaped_specials = sorted((re.escape(t) for t in special_tokens), key=len, reverse=True)
-    special_token_split_re = re.compile(f"({'|'.join(escaped_specials)})")
+    special_token_split_re = re.compile("|".join(escaped_specials))
 
-    def tokenize_chunk_iter(text: str) -> Iterator[list[int]]:
-        for word in special_token_split_re.split(text):
-            if not word:  # empty split piece → ignore
-                continue
-            if word in special_tokens:
-                yield [tok2id[word.encode("utf-8")]]
-            else:
-                for m in PAT_RE.finditer(word):
-                    word_bytes = m.group().encode("utf-8")
-                    yield [tok2id[bytes([b])] for b in word_bytes]
+    def pre_tokenize(text_chunk: str) -> Iterator[bytes]:
+        for word in special_token_split_re.split(text_chunk):
+            for m in PAT_RE.finditer(word):
+                yield m.group().encode()
 
     # TODO: parallelize once working
     with open(input_path, encoding="utf-8") as f:
         text = f.read()
-
     # num_processes = os.cpu_count() or 4
     # with open(input_path, "rb") as f:
     #     boundaries = find_chunk_boundaries(f, num_processes, "<|endoftext|>".encode("utf-8"))
@@ -52,7 +45,17 @@ def train_bpe(
     #         f.seek(start)
     #         chunk = f.read(end - start).decode("utf-8", errors="ignore")
     #
-    token_chunks: list[list[int]] = list(tokenize_chunk_iter(text))
+
+    # pre-tokens with counts
+    # word_counts: dict[bytes, int] =
+    word_counts = Counter(pre_tokenize(text))
+
+    words_tokenized = []
+    counts = []
+
+    for word, count in word_counts.items():
+        words_tokenized.append([tok2id[bytes([b])] for b in word])
+        counts.append(count)
 
     merges: list[tuple[bytes, bytes]] = []
 
@@ -60,10 +63,10 @@ def train_bpe(
         # TODO: count once and update in-place during merge 0 -1 (old) -1 0 => 0 1 1 0
         # TODO: on the parallel - collect Δs and merge
         stats = Counter()
-        for chunk in token_chunks:
+        for chunk, count in zip(words_tokenized, counts):
             for j in range(len(chunk) - 1):
                 pair = (chunk[j], chunk[j + 1])
-                stats[pair] += 1
+                stats[pair] += count
         max_count = max(stats.values())
         # Get all pairs with max count
         max_pairs = [pair for pair, count in stats.items() if count == max_count]
@@ -81,7 +84,7 @@ def train_bpe(
         print(f"merging {new_token_idx}: pair:{pair_bytes}->{pair_bytes[0] + pair_bytes[1]} count:{max_count}")
 
         new_token_chunks = []
-        for chunk in token_chunks:
+        for chunk in words_tokenized:
             new_chunk = []
             j = 0
             while j < len(chunk):
@@ -93,6 +96,6 @@ def train_bpe(
                     j += 1
             new_token_chunks.append(new_chunk)
 
-        token_chunks = new_token_chunks
+        words_tokenized = new_token_chunks
 
     return id2tok, list(merges)
