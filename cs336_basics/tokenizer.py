@@ -90,15 +90,15 @@ def train_bpe(
                 if j < len(chunk) - 1 and (chunk[j], chunk[j + 1]) == top_pair:
                     # update stats
                     c = counts[index]
-                    to_the_left_token = chunk[j - 1] if j > 0 else -1
-                    to_the_right_token = chunk[j + 2] if j < len(chunk) - 2 else -1
-                    if to_the_right_token != -1:
+                    if j < len(chunk) - 2:
+                        to_the_right_token = chunk[j + 2]
                         pair_stats[(chunk[j + 1], to_the_right_token)] -= c
                         pair_stats[(new_token_idx, to_the_right_token)] += c
-                    if to_the_left_token != - 1:
+                    if j > 0:
+                        to_the_left_token = chunk[j - 1]
                         pair_stats[(to_the_left_token, chunk[j])] -= c
                         pair_stats[(to_the_left_token, new_token_idx)] += c
-
+                    # merge matched
                     chunk[j] = new_token_idx
                     idx_to_delete.append(j+1)
                     j += 1
