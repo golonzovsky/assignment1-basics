@@ -84,34 +84,27 @@ def train_bpe(
         # print(f"merging {new_token_idx}: pair:{pair_bytes}->{pair_bytes[0] + pair_bytes[1]} count:{max_count}")
 
         for index, chunk in enumerate(words_tokenized):
-            new_chunk = []
+            idx_to_delete = []
             j = 0
             while j < len(chunk):
                 if j < len(chunk) - 1 and (chunk[j], chunk[j + 1]) == top_pair:
-                    new_chunk.append(new_token_idx)
-                    old_idx_left = j
-                    old_idx_right = j + 1
-                    j += 2
-
                     # update stats
                     c = counts[index]
-                    if len(chunk) > 2:
-                        if old_idx_left == 0 and old_idx_right < len(chunk) - 1: # start of 3+
-                            pair_stats[(chunk[old_idx_right], chunk[old_idx_right + 1])] -= c
-                            pair_stats[(new_token_idx, chunk[old_idx_right + 1])] += c
-                        elif old_idx_right == len(chunk) - 1: # end
-                            pair_stats[(chunk[old_idx_left - 1], chunk[old_idx_left])] -= c
-                            pair_stats[(chunk[old_idx_left - 1], new_token_idx)] += c
-                        else: # middle
-                            pair_stats[(chunk[old_idx_right], chunk[old_idx_right + 1])] -= c
-                            pair_stats[(new_token_idx, chunk[old_idx_right + 1])] += c
-                            pair_stats[(chunk[old_idx_left - 1], chunk[old_idx_left])] -= c
-                            pair_stats[(chunk[old_idx_left - 1], new_token_idx)] += c
+                    to_the_left_token = chunk[j - 1] if j > 0 else -1
+                    to_the_right_token = chunk[j + 2] if j < len(chunk) - 2 else -1
+                    if to_the_right_token != -1:
+                        pair_stats[(chunk[j + 1], to_the_right_token)] -= c
+                        pair_stats[(new_token_idx, to_the_right_token)] += c
+                    if to_the_left_token != - 1:
+                        pair_stats[(to_the_left_token, chunk[j])] -= c
+                        pair_stats[(to_the_left_token, new_token_idx)] += c
 
-                else:
-                    new_chunk.append(chunk[j])
+                    chunk[j] = new_token_idx
+                    idx_to_delete.append(j+1)
                     j += 1
-            words_tokenized[index] = new_chunk
+                j += 1
+            if len(idx_to_delete) > 0:
+                words_tokenized[index] = [item for i, item in enumerate(chunk) if i not in idx_to_delete]
 
 
     return {i: t for i, t in enumerate(id2tok)}, list(merges)
