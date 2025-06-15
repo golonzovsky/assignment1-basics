@@ -20,7 +20,13 @@ dependencies = [
     "wandb>=0.19.7",
 ]
 
+[build-system]
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"
 
+[tool.maturin]
+features = ["pyo3/extension-module"]
+manifest-path = "cs336_basics_rs/Cargo.toml"
 
 [tool.setuptools.packages.find]
 include = ["cs336_basics"]
