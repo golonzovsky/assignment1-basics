@@ -1,7 +1,8 @@
 import os
-import regex as re
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterator, Iterable
+
+import regex as re
 
 PAT_RE = re.compile(r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}++| ?\p{N}++| ?[^\s\p{L}\p{N}]++|\s++$|\s+(?!\S)|\s""")
 
@@ -100,11 +101,31 @@ def train_bpe(
                         pair_stats[(to_the_left_token, new_token_idx)] += c
                     # merge matched
                     chunk[j] = new_token_idx
-                    idx_to_delete.append(j+1)
+                    idx_to_delete.append(j + 1)
                     j += 1
                 j += 1
             if len(idx_to_delete) > 0:
                 words_tokenized[index] = [item for i, item in enumerate(chunk) if i not in idx_to_delete]
 
-
     return {i: t for i, t in enumerate(id2tok)}, list(merges)
+
+
+class Tokenizer:
+    def __init__(
+        self, vocab: dict[int, bytes], merges: list[tuple[bytes, bytes]], special_tokens: list[str] | None = None
+    ):
+        self.vocab = vocab
+        self.merges = merges
+        self.special_tokens = special_tokens
+
+    def from_files(self, vocab_filepath: str, merges_filepath: str, special_tokens: list[str] | None = None):
+        raise NotImplementedError
+
+    def encode(self, test: str) -> list[int]:
+        raise NotImplementedError
+
+    def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
+        raise NotImplementedError
+
+    def decode(self, ids: list[int]) -> str:
+        raise NotImplementedError
