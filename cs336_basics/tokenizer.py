@@ -7,6 +7,14 @@ import regex as re
 PAT_RE = re.compile(r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}++| ?\p{N}++| ?[^\s\p{L}\p{N}]++|\s++$|\s+(?!\S)|\s""")
 
 
+def pre_tokenize(text_chunk: str, special_tokens: list[str]) -> Iterator[bytes]:
+    escaped_specials = sorted((re.escape(t) for t in special_tokens), key=len, reverse=True)
+    special_token_split_re = re.compile("|".join(escaped_specials))
+    for word in special_token_split_re.split(text_chunk):
+        for m in PAT_RE.finditer(word):
+            yield m.group().encode()
+
+
 def train_bpe(
     input_path: str | os.PathLike,
     vocab_size: int,
@@ -23,16 +31,8 @@ def train_bpe(
     id2tok = [s.encode() for s in special_tokens] + [bytes([i]) for i in range(256)]
     tok2id = {tok: idx for idx, tok in enumerate(id2tok)}
 
-    # iterator over tokenized words
-    escaped_specials = sorted((re.escape(t) for t in special_tokens), key=len, reverse=True)
-    special_token_split_re = re.compile("|".join(escaped_specials))
-
-    def pre_tokenize(text_chunk: str) -> Iterator[bytes]:
-        for word in special_token_split_re.split(text_chunk):
-            for m in PAT_RE.finditer(word):
-                yield m.group().encode()
-
     # TODO: parallelize once working
+    # upd: this is not a bottleneck comparing to merges, fix that first
     with open(input_path, encoding="utf-8") as f:
         text = f.read()
     # num_processes = os.cpu_count() or 4
@@ -41,10 +41,9 @@ def train_bpe(
     #     for start, end in zip(boundaries[:-1], boundaries[1:]):
     #         f.seek(start)
     #         chunk = f.read(end - start).decode("utf-8", errors="ignore")
-    #
 
     # count pre-tokens
-    word_counts = Counter(pre_tokenize(text))
+    word_counts = Counter(pre_tokenize(text, special_tokens))
 
     words_tokenized = []
     counts = []
@@ -114,18 +113,65 @@ class Tokenizer:
     def __init__(
         self, vocab: dict[int, bytes], merges: list[tuple[bytes, bytes]], special_tokens: list[str] | None = None
     ):
-        self.vocab = vocab
+        self.id2tok = vocab
+        self.tok2id = {b: i for i, b in vocab.items()}
         self.merges = merges
-        self.special_tokens = special_tokens
+        self.special_tokens = special_tokens or []
 
     def from_files(self, vocab_filepath: str, merges_filepath: str, special_tokens: list[str] | None = None):
         raise NotImplementedError
 
-    def encode(self, test: str) -> list[int]:
-        raise NotImplementedError
+    def encode(self, text: str) -> list[int]:
+        words = list(pre_tokenize(text, special_tokens=self.special_tokens))
+        print(f"{words=}")
+        words_tokenized: list[list[int]] = []
+
+        for word in words:
+            if word in self.tok2id:
+                words_tokenized.append([self.tok2id[word]])
+                continue
+            byte_ids = [self.tok2id[bytes([b])] for b in word]
+            words_tokenized.append(byte_ids)
+
+        print(f"{words_tokenized=}")
+
+        while True:
+            did_merge = False
+            for word_idx, word_tokens in enumerate(words_tokenized):  # TODO: parallelizable
+                min_rank_candidate_token = 1000000
+                position = -1
+                for i, (t1, t2) in enumerate(zip(word_tokens[:-1], word_tokens[1:])):
+                    maybe_pair = self.id2tok[t1] + self.id2tok[t2]
+                    rank = self.tok2id.get(maybe_pair, None)
+                    # print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
+                    if rank is None:
+                        continue
+                    if rank < min_rank_candidate_token:
+                        min_rank_candidate_token = rank
+                        position = i
+                        did_merge = True
+                if position == -1:
+                    break
+                # merge
+                words_tokenized[word_idx] = (
+                    word_tokens[:position] + [min_rank_candidate_token] + word_tokens[position + 2 :]
+                )
+
+            if not did_merge:
+                break
+
+        return [t for word in words_tokenized for t in word]
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
         raise NotImplementedError
 
     def decode(self, ids: list[int]) -> str:
         raise NotImplementedError
+
+
+def test_encoding():
+    # vocab :  dict[int, bytes]
+    t = Tokenizer(vocab={0: b"<|alex|>", 1: b"a", 2: b"b", 3: b" ", 4: b"ab"}, merges=[], special_tokens=["<|alex|>"])
+    tokens = t.encode("aaabab ab")
+    print(f"{tokens=}")
+    assert tokens == [1, 1, 4, 4, 3, 4]
