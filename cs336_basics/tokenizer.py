@@ -178,7 +178,8 @@ class Tokenizer:
         raise NotImplementedError
 
     def decode(self, ids: list[int]) -> str:
-        raise NotImplementedError
+        raw_bytes = b"".join([self.id2tok[id] for id in ids])
+        return bytes.decode(raw_bytes, errors="replace")
 
 
 def test_encoding():
@@ -209,10 +210,12 @@ def test_bpe_encoding():
         merges=[],
         special_tokens=[],
     )
-    tokens = t.encode("the cat ate")
+    text = "the cat ate"
+    tokens = t.encode(text)
     print(f"{tokens=}")
 
     def debug_tokens(tokens: list[int]):
         return [(vocab[i], i) for i in tokens]
 
     assert debug_tokens(tokens) == debug_tokens([9, 7, 1, 5, 10, 3])
+    assert t.decode(tokens) == text
