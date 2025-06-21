@@ -198,7 +198,9 @@ def test_roundtrip_unicode_string():
     test_string = "Héllò hôw are ü? 🙃"
     encoded_ids = tokenizer.encode(test_string)
     decoded_string = tokenizer.decode(encoded_ids)
-    assert test_string == decoded_string
+    assert decoded_string == test_string
+
+
 
 
 def test_unicode_string_matches_tiktoken():

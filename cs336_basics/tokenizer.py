@@ -145,7 +145,7 @@ class Tokenizer:
                 scan_start = 0  # start from prev merge_position instead of start
 
                 # keep iter inside word until no pair is mergeable
-                while True:
+                while True:  # TODO: replace with simple iteration since its greedy BPE encoding, we roll forward
                     min_rank_candidate_token = rank_not_found_max
                     merge_position = -1
                     for i, (t1, t2) in enumerate(
@@ -159,7 +159,7 @@ class Tokenizer:
                         if rank < min_rank_candidate_token:
                             min_rank_candidate_token = rank
                             merge_position = scan_start + i
-                            scan_start = merge_position  # TODO: maybe its max(0, merge_position-1) to catch prev-with-new token merges
+                            scan_start = max(0, merge_position - 1)  # to catch (prev, new) token merges
 
                     if merge_position == -1:
                         break
@@ -174,7 +174,7 @@ class Tokenizer:
                 yield from word_tokens_mut
 
     def decode(self, ids: list[int]) -> str:
-        raw_bytes = b"".join([self.id2tok[id] for id in ids])
+        raw_bytes = b"".join([self.id2tok[tok_id] for tok_id in ids])
         return bytes.decode(raw_bytes, errors="replace")
 
 
