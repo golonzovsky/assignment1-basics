@@ -142,10 +142,10 @@ class Tokenizer:
 
             for word_tokens in self._to_token_words(text):  # PERF: parallelizable
                 word_tokens_mut = word_tokens
-                scan_start = 0  # start from prev merge_position instead of start
+                scan_start = 0  # allows to start from first found pair position instead of zero. kinda optimization
 
                 # keep iter inside word until no pair is mergeable
-                while True:  # TODO: replace with simple iteration since its greedy BPE encoding, we roll forward
+                while True:
                     min_rank_candidate_token = rank_not_found_max
                     merge_position = -1
                     current_start = scan_start
@@ -155,7 +155,11 @@ class Tokenizer:
                         maybe_pair = self.id2tok[t1] + self.id2tok[t2]
                         rank = self.tok2id.get(maybe_pair, None)
                         if rank is None:
-                            scan_start = max(0, current_start + i - 1)
+                            if merge_position == -1:
+                                scan_start = max(
+                                    0,
+                                    current_start + i,
+                                )  # updating start to before first pair, since it might be not the lowest rank
                             continue
                         print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
                         if rank < min_rank_candidate_token:
