@@ -127,55 +127,51 @@ class Tokenizer:
         raise NotImplementedError
 
     def encode(self, text: str) -> list[int]:
-        print(f"{pre_tokenize(text, special_tokens=self.special_tokens)=}")
+        return list(self.encode_iterable([text]))
 
-        # PERF: after debug convert to Iterator[list[int]] so we dont dump all to mem, not sure if makes a difference given signature
-        words_tokenized: list[list[int]] = []
-        for word in pre_tokenize(text, special_tokens=self.special_tokens):
+    def _to_token_words(self, s: str) -> Iterator[list[int]]:
+        for word in pre_tokenize(s, special_tokens=self.special_tokens):
             if word in self.tok2id:
-                words_tokenized.append([self.tok2id[word]])
+                yield [self.tok2id[word]]
                 continue
-            byte_ids = [self.tok2id[bytes([b])] for b in word]
-            words_tokenized.append(byte_ids)
-
-        print(f"{words_tokenized=}")
-        rank_not_found_max = len(self.tok2id) + 1000
-
-        for word_idx, word_tokens in enumerate(words_tokenized):  # PERF: parallelizable
-            word_tokens_mut = word_tokens
-            scan_start = 0  # start from prev merge_position instead of start
-
-            # keep iter inside word until no pair is mergeable
-            while True:
-                min_rank_candidate_token = rank_not_found_max
-                merge_position = -1
-                for i, (t1, t2) in enumerate(zip(word_tokens_mut[scan_start:-1], word_tokens_mut[scan_start + 1 :])):
-                    maybe_pair = self.id2tok[t1] + self.id2tok[t2]
-                    rank = self.tok2id.get(maybe_pair, None)
-                    # print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
-                    if rank is None:
-                        continue
-                    if rank < min_rank_candidate_token:
-                        min_rank_candidate_token = rank
-                        merge_position = scan_start + i
-                        scan_start = merge_position  # TODO: maybe its max(0, merge_position-1) to catch prev-with-new token merges
-
-                if merge_position == -1:
-                    break
-                print(f"{word_idx=} before merge {scan_start=} {merge_position=} {word_tokens_mut=}")
-                word_tokens_mut = (
-                    word_tokens_mut[:merge_position]
-                    + [min_rank_candidate_token]
-                    + word_tokens_mut[merge_position + 2 :]
-                )
-                print(f"{word_idx=} after merge {scan_start=} {word_tokens_mut=}")
-
-            words_tokenized[word_idx] = word_tokens_mut
-
-        return [t for word in words_tokenized for t in word]
+            yield [self.tok2id[bytes([b])] for b in word]
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
-        raise NotImplementedError
+        for text in iterable:
+            rank_not_found_max = len(self.tok2id) + 1000
+
+            for word_tokens in self._to_token_words(text):  # PERF: parallelizable
+                word_tokens_mut = word_tokens
+                scan_start = 0  # start from prev merge_position instead of start
+
+                # keep iter inside word until no pair is mergeable
+                while True:
+                    min_rank_candidate_token = rank_not_found_max
+                    merge_position = -1
+                    for i, (t1, t2) in enumerate(
+                        zip(word_tokens_mut[scan_start:-1], word_tokens_mut[scan_start + 1 :])
+                    ):
+                        maybe_pair = self.id2tok[t1] + self.id2tok[t2]
+                        rank = self.tok2id.get(maybe_pair, None)
+                        # print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
+                        if rank is None:
+                            continue
+                        if rank < min_rank_candidate_token:
+                            min_rank_candidate_token = rank
+                            merge_position = scan_start + i
+                            scan_start = merge_position  # TODO: maybe its max(0, merge_position-1) to catch prev-with-new token merges
+
+                    if merge_position == -1:
+                        break
+                    print(f"before merge {scan_start=} {merge_position=} {word_tokens_mut=}")
+                    word_tokens_mut = (
+                        word_tokens_mut[:merge_position]
+                        + [min_rank_candidate_token]
+                        + word_tokens_mut[merge_position + 2 :]
+                    )
+                    print(f"after merge {scan_start=} {word_tokens_mut=}")
+
+                yield from word_tokens_mut
 
     def decode(self, ids: list[int]) -> str:
         raw_bytes = b"".join([self.id2tok[id] for id in ids])
