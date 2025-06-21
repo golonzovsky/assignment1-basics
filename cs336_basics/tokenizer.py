@@ -148,18 +148,19 @@ class Tokenizer:
                 while True:  # TODO: replace with simple iteration since its greedy BPE encoding, we roll forward
                     min_rank_candidate_token = rank_not_found_max
                     merge_position = -1
+                    current_start = scan_start
                     for i, (t1, t2) in enumerate(
-                        zip(word_tokens_mut[scan_start:-1], word_tokens_mut[scan_start + 1 :])
+                        zip(word_tokens_mut[current_start:-1], word_tokens_mut[current_start + 1 :])
                     ):
                         maybe_pair = self.id2tok[t1] + self.id2tok[t2]
                         rank = self.tok2id.get(maybe_pair, None)
-                        # print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
                         if rank is None:
+                            scan_start = max(0, current_start + i - 1)
                             continue
+                        print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
                         if rank < min_rank_candidate_token:
                             min_rank_candidate_token = rank
-                            merge_position = scan_start + i
-                            scan_start = max(0, merge_position - 1)  # to catch (prev, new) token merges
+                            merge_position = current_start + i
 
                     if merge_position == -1:
                         break
