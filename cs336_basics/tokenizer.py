@@ -129,7 +129,7 @@ class Tokenizer:
     def encode(self, text: str) -> list[int]:
         print(f"{pre_tokenize(text, special_tokens=self.special_tokens)=}")
 
-        # TODO: after debug convert to Iterator[list[int]]
+        # PERF: after debug convert to Iterator[list[int]] so we dont dump all to mem, not sure if makes a difference given signature
         words_tokenized: list[list[int]] = []
         for word in pre_tokenize(text, special_tokens=self.special_tokens):
             if word in self.tok2id:
@@ -141,13 +141,15 @@ class Tokenizer:
         print(f"{words_tokenized=}")
         rank_not_found_max = len(self.tok2id) + 1000
 
-        for word_idx, word_tokens in enumerate(words_tokenized):  # TODO: parallelizable
+        for word_idx, word_tokens in enumerate(words_tokenized):  # PERF: parallelizable
             word_tokens_mut = word_tokens
+            scan_start = 0  # start from prev merge_position instead of start
+
+            # keep iter inside word until no pair is mergeable
             while True:
                 min_rank_candidate_token = rank_not_found_max
                 merge_position = -1
-
-                for i, (t1, t2) in enumerate(zip(word_tokens_mut[:-1], word_tokens_mut[1:])):
+                for i, (t1, t2) in enumerate(zip(word_tokens_mut[scan_start:-1], word_tokens_mut[scan_start + 1 :])):
                     maybe_pair = self.id2tok[t1] + self.id2tok[t2]
                     rank = self.tok2id.get(maybe_pair, None)
                     # print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
@@ -155,18 +157,18 @@ class Tokenizer:
                         continue
                     if rank < min_rank_candidate_token:
                         min_rank_candidate_token = rank
-                        merge_position = i
+                        merge_position = scan_start + i
+                        scan_start = merge_position  # TODO: maybe its max(0, merge_position-1) to catch prev-with-new token merges
 
                 if merge_position == -1:
                     break
-                # merge
-                # print(f"{word_idx=} before merge {merge_position=} {word_tokens_mut=}")
+                print(f"{word_idx=} before merge {scan_start=} {merge_position=} {word_tokens_mut=}")
                 word_tokens_mut = (
                     word_tokens_mut[:merge_position]
                     + [min_rank_candidate_token]
                     + word_tokens_mut[merge_position + 2 :]
                 )
-                # print(f"{word_idx=} after merge {word_tokens_mut=}")
+                print(f"{word_idx=} after merge {scan_start=} {word_tokens_mut=}")
 
             words_tokenized[word_idx] = word_tokens_mut
 
@@ -209,4 +211,8 @@ def test_bpe_encoding():
     )
     tokens = t.encode("the cat ate")
     print(f"{tokens=}")
-    assert [(vocab[i], i) for i in tokens] == [(vocab[i], i) for i in [9, 7, 1, 5, 10, 3]]
+
+    def debug_tokens(tokens: list[int]):
+        return [(vocab[i], i) for i in tokens]
+
+    assert debug_tokens(tokens) == debug_tokens([9, 7, 1, 5, 10, 3])
