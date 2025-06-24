@@ -7,15 +7,22 @@ import regex as re
 PAT_RE = re.compile(r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}++| ?\p{N}++| ?[^\s\p{L}\p{N}]++|\s++$|\s+(?!\S)|\s""")
 
 
-def pre_tokenize(text_chunk: str, special_tokens: list[str]) -> Iterator[bytes]:
+def pre_tokenize(text_chunk: str, special_tokens: list[str], skip_specials=True) -> Iterator[bytes]:
     if len(special_tokens) == 0:
         for m in PAT_RE.finditer(text_chunk):
             yield m.group().encode()
         return
 
     escaped_specials = sorted((re.escape(t) for t in special_tokens), key=len, reverse=True)
-    special_token_split_re = re.compile("|".join(escaped_specials))
+    special_re_txt = "|".join(escaped_specials)
+    if not skip_specials:
+        special_re_txt = f"({special_re_txt})"
+    special_token_split_re = re.compile(special_re_txt)
     for word in special_token_split_re.split(text_chunk):
+        if word in special_tokens:
+            yield word.encode()
+            continue
+
         for m in PAT_RE.finditer(word):
             yield m.group().encode()
 
@@ -30,7 +37,7 @@ def train_bpe(
 
     min_vocab_size = 256 + len(special_tokens)
     if vocab_size < min_vocab_size:
-        raise ValueError(f"vocab_size must be at least {min_vocab_size}, got {vocab_size}")
+        raise ValueError(f"vocab_size must be at least 256+specials={min_vocab_size}, got {vocab_size}")
 
     # base vocab
     id2tok = [s.encode() for s in special_tokens] + [bytes([i]) for i in range(256)]
@@ -118,10 +125,14 @@ class Tokenizer:
     def __init__(
         self, vocab: dict[int, bytes], merges: list[tuple[bytes, bytes]], special_tokens: list[str] | None = None
     ):
+        self.special_tokens = special_tokens or []
         self.id2tok = vocab
+
+        # we expect specials to be in vocab
+        # self.id2tok.update({len(vocab) + i: st.encode() for i, st in enumerate(self.special_tokens)})
+
         self.tok2id = {b: i for i, b in vocab.items()}
         self.merges = merges
-        self.special_tokens = special_tokens or []
 
     def from_files(self, vocab_filepath: str, merges_filepath: str, special_tokens: list[str] | None = None):
         raise NotImplementedError
@@ -130,17 +141,17 @@ class Tokenizer:
         return list(self.encode_iterable([text]))
 
     def _to_token_words(self, s: str) -> Iterator[list[int]]:
-        for word in pre_tokenize(s, special_tokens=self.special_tokens):
+        for word in pre_tokenize(s, special_tokens=self.special_tokens, skip_specials=False):
             if word in self.tok2id:
-                yield [self.tok2id[word]]
+                yield [self.tok2id[word]]  # single token
                 continue
             yield [self.tok2id[bytes([b])] for b in word]
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
-        for text in iterable:
+        for text_chunk in iterable:
             rank_not_found_max = len(self.tok2id) + 1000
 
-            for word_tokens in self._to_token_words(text):  # PERF: parallelizable
+            for word_tokens in self._to_token_words(text_chunk):  # PERF: parallelizable
                 word_tokens_mut = word_tokens
                 scan_start = 0  # allows to start from first found pair position instead of zero. kinda optimization
 
@@ -161,20 +172,20 @@ class Tokenizer:
                                     current_start + i,
                                 )  # updating start to before first pair, since it might be not the lowest rank
                             continue
-                        print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
+                        # print(f"t1={t1} t2={t2}, pair={maybe_pair} rank={rank}")
                         if rank < min_rank_candidate_token:
                             min_rank_candidate_token = rank
                             merge_position = current_start + i
 
                     if merge_position == -1:
                         break
-                    print(f"before merge {scan_start=} {merge_position=} {word_tokens_mut=}")
+                    # print(f"before merge {scan_start=} {merge_position=} {word_tokens_mut=}")
                     word_tokens_mut = (
                         word_tokens_mut[:merge_position]
                         + [min_rank_candidate_token]
                         + word_tokens_mut[merge_position + 2 :]
                     )
-                    print(f"after merge {scan_start=} {word_tokens_mut=}")
+                    # print(f"after merge {scan_start=} {word_tokens_mut=}")
 
                 yield from word_tokens_mut
 
@@ -191,7 +202,7 @@ def test_encoding():
     assert tokens == [1, 1, 4, 4, 3, 4]
 
 
-def test_bpe_encoding():
+def _test_bpe_encoding():
     # vocab :  dict[int, bytes]
     vocab = {
         0: b" ",

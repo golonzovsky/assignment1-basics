@@ -201,8 +201,6 @@ def test_roundtrip_unicode_string():
     assert decoded_string == test_string
 
 
-
-
 def test_unicode_string_matches_tiktoken():
     reference_tokenizer = tiktoken.get_encoding("gpt2")
     tokenizer = get_tokenizer_from_vocab_merges_path(
