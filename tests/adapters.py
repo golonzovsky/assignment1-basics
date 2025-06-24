@@ -10,6 +10,9 @@ import torch
 from torch import Tensor
 
 
+from cs336_basics.linear import Linear
+
+
 def run_linear(
     d_in: int,
     d_out: int,
@@ -20,8 +23,8 @@ def run_linear(
     Given the weights of a Linear layer, compute the transformation of a batched input.
 
     Args:
-        in_dim (int): The size of the input dimension
-        out_dim (int): The size of the output dimension
+        d_in (int): The size of the input dimension
+        d_out (int): The size of the output dimension
         weights (Float[Tensor, "d_out d_in"]): The linear weights to use
         in_features (Float[Tensor, "... d_in"]): The output tensor to apply the function to
 
@@ -29,7 +32,9 @@ def run_linear(
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
 
-    raise NotImplementedError
+    layer = Linear(d_in, d_out)
+    layer.load_state_dict({"w": weights})
+    return layer.forward(in_features)
 
 
 def run_embedding(
@@ -102,7 +107,6 @@ def run_scaled_dot_product_attention(
         V (Float[Tensor, " ... values d_v"]): Values tensor
         mask (Float[Tensor, " ... queries keys"] | None): Mask tensor
     Returns:
-        Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
     raise NotImplementedError
 
@@ -512,7 +516,6 @@ def run_save_checkpoint(
         model (torch.nn.Module): Serialize the state of this model.
         optimizer (torch.optim.Optimizer): Serialize the state of this optimizer.
         iteration (int): Serialize this value, which represents the number of training iterations
-            we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
     raise NotImplementedError

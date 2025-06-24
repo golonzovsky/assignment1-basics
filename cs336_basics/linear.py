@@ -6,8 +6,7 @@ from torch import Tensor, device, dtype
 class Linear(nn.Module):
     def __init__(self, in_features: int, out_features: int, device: device | None = None, dtype: dtype | None = None):
         super().__init__()
-        # torch.nn.init.trunc_normal_
-        w = torch.empty(out_features, in_features)
+        w = torch.empty(out_features, in_features, device=device, dtype=dtype)
         torch.nn.init.trunc_normal_(w)
         self.w = nn.Parameter(w)
 
