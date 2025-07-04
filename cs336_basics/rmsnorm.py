@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from jaxtyping import Float
 from torch import Tensor, device, dtype
-from einops import einsum, reduce, rearrange
+from einops import reduce
 
 
 class RMSNorm(nn.Module):
