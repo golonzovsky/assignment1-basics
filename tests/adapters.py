@@ -93,7 +93,12 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    #
+    swiglu = SwiGLU(d_model, d_ff)
+    swiglu.w1.load_state_dict({"weights": w1_weight})
+    swiglu.w2.load_state_dict({"weights": w2_weight})
+    swiglu.w3.load_state_dict({"weights": w3_weight})
+    return swiglu.forward(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -550,6 +555,7 @@ def run_load_checkpoint(
     raise NotImplementedError
 
 
+from cs336_basics.swiglu import SwiGLU
 from cs336_basics.tokenizer import Tokenizer, train_bpe
 
 
