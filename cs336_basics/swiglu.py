@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from jaxtyping import Float
 from torch import Tensor, device, dtype
-from einops import reduce, einsum
 
 from cs336_basics.linear import Linear
 
