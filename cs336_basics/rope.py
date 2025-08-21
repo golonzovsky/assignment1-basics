@@ -42,7 +42,7 @@ class RotaryPositionalEmbedding(nn.Module):
         self, x: Float[Tensor, " ... seq_len d_k"], token_positions: Int[Tensor, " ... seq_len"]
     ) -> Float[Tensor, " ... seq_len d_k"]:
         rotations = self.precomputed[token_positions]
-        #print(f"{x.shape=}, {token_positions.shape=}, {self.precomputed.shape=}, {rotations.shape=}")
+        # print(f"{x.shape=}, {token_positions.shape=}, {self.precomputed.shape=}, {rotations.shape=}")
         return einsum(
             x,
             rotations,
