@@ -17,6 +17,8 @@ class RotaryPositionalEmbedding(nn.Module):
         self.device = device
         self.dtype = dtype
 
+        assert self.d_k % 2 == 0
+
         matrices = [self.rotation_matrix(i) for i in range(self.max_seq_len)]
         precomputed: Float[Tensor, "max_seq_len d_k d_k"] = torch.stack(matrices)
         self.register_buffer("precomputed", precomputed, persistent=False)
@@ -46,5 +48,5 @@ class RotaryPositionalEmbedding(nn.Module):
         return einsum(
             x,
             rotations,
-            "... seq_len d_k, seq_len d_k d_k -> ... seq_len d_k"
+            "... seq_len d_k, seq_len d_k2 d_k -> ... seq_len d_k2"
         )
