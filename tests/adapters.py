@@ -14,6 +14,7 @@ from cs336_basics.embedding import Embedding
 from cs336_basics.rmsnorm import RMSNorm
 from cs336_basics.rope import RotaryPositionalEmbedding
 from cs336_basics.softmax import softmax
+from cs336_basics.scaled_dot_product_attention import ScaledDotProductAttention
 
 # from torch.nn import Linear
 
@@ -120,7 +121,7 @@ def run_scaled_dot_product_attention(
         mask (Float[Tensor, " ... queries keys"] | None): Mask tensor
     Returns:
     """
-    raise NotImplementedError
+    return ScaledDotProductAttention().forward(Q, K, V, mask=mask)
 
 
 def run_multihead_self_attention(
