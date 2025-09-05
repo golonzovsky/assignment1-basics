@@ -15,6 +15,7 @@ from cs336_basics.rmsnorm import RMSNorm
 from cs336_basics.rope import RotaryPositionalEmbedding
 from cs336_basics.softmax import softmax
 from cs336_basics.scaled_dot_product_attention import ScaledDotProductAttention
+from cs336_basics.multihead_self_attention import MultiheadSelfAttention
 
 # from torch.nn import Linear
 
@@ -155,7 +156,9 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    layer = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads)
+    layer.load_state_dict({"wq": q_proj_weight, "wk": k_proj_weight, "wv": v_proj_weight, "wo": o_proj_weight})
+    return layer.forward(in_features=in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -195,7 +198,10 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(theta, d_model, max_seq_len)
+    layer = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads, rope_submodule=rope)
+    layer.load_state_dict({"wq": q_proj_weight, "wk": k_proj_weight, "wv": v_proj_weight, "wo": o_proj_weight})
+    return layer.forward(in_features=in_features, token_positions=token_positions)
 
 
 def run_rope(

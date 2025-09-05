@@ -23,6 +23,7 @@ class ScaledDotProductAttention(nn.Module):
         qk = einsum(Q, K, "... queries d_k, ... keys d_k -> ... queries keys") / sqrt(d_k)
         masked_qk = qk
         if mask is not None:
-            masked_qk[~mask] = float("-inf")
+            # masked_qk[~mask] = float("-inf")
+            masked_qk = qk.masked_fill(~mask, float("-inf"))
         sm = softmax(masked_qk, dim=-1)
-        return einsum(sm, V, "... queries keys , ... values d_v ->  ... queries d_v")
+        return einsum(sm, V, "... queries keys , ... keys d_v ->  ... queries d_v")
