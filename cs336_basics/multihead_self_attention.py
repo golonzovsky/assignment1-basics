@@ -58,7 +58,7 @@ class MultiheadSelfAttention(nn.Module):
         v = rearrange(v_flat, "... seq (n_heads d_head) -> ... n_heads seq d_head", n_heads=self.num_heads)
 
         if self.rope is not None and token_positions is not None:
-            print(f"!!!!!!!!!!!!{q.shape=} {in_features.shape=} {token_positions.shape=}")
+            # print(f"!!!!!!!!!!!!{q.shape=} {in_features.shape=} {token_positions.shape=}")
             q = self.rope.forward(q, token_positions)
             k = self.rope.forward(k, token_positions)
 

@@ -27,7 +27,7 @@ class RotaryPositionalEmbedding(nn.Module):
         res = torch.zeros(self.d_k, self.d_k, device=self.device, dtype=self.dtype)
         for k in range(self.d_k // 2):
             idx = k * 2
-            res[idx:idx + 2, idx:idx + 2] = self.rotation_block(i, k)
+            res[idx : idx + 2, idx : idx + 2] = self.rotation_block(i, k)
         # blocks.append(block) return torch.block_diag(*blocks)
         return res
 
@@ -36,7 +36,7 @@ class RotaryPositionalEmbedding(nn.Module):
         # Compute in log space for numerical stability
         # log_theta = math.log(self.theta)
         # angle = i * math.exp(-2 * k * log_theta / self.d_k)
-        s = math.sin(angle) # consider using torch.sin vectorized
+        s = math.sin(angle)  # consider using torch.sin vectorized
         c = math.cos(angle)
         return torch.tensor([[c, -s], [s, c]], device=self.device, dtype=self.dtype)
 
@@ -45,8 +45,4 @@ class RotaryPositionalEmbedding(nn.Module):
     ) -> Float[Tensor, " ... seq_len d_k"]:
         rotations = self.precomputed[token_positions]
         # print(f"{x.shape=}, {token_positions.shape=}, {self.precomputed.shape=}, {rotations.shape=}")
-        return einsum(
-            x,
-            rotations,
-            "... seq_len d_k, seq_len d_k2 d_k -> ... seq_len d_k2"
-        )
+        return einsum(x, rotations, "... seq_len d_k, ... seq_len d_k2 d_k -> ... seq_len d_k2")
