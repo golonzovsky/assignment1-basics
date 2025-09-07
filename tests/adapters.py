@@ -198,7 +198,8 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    rope = RotaryPositionalEmbedding(theta, d_model, max_seq_len)
+    head_dim = d_model // num_heads
+    rope = RotaryPositionalEmbedding(theta, head_dim, max_seq_len)
     layer = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads, rope_submodule=rope)
     layer.load_state_dict({"wq": q_proj_weight, "wk": k_proj_weight, "wv": v_proj_weight, "wo": o_proj_weight})
     return layer.forward(in_features=in_features, token_positions=token_positions)
