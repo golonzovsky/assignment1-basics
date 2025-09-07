@@ -47,12 +47,11 @@ class MultiheadSelfAttention(nn.Module):
         in_features: Float[Tensor, " ... seq d_in"],
         token_positions: Int[Tensor, " ... sequence_length"] | None = None,
     ) -> Float[Tensor, " ... seq d_out"]:
-        # Project first
         q_flat = einsum(in_features, self.wq, "... seq d_in, d_q d_in -> ... seq d_q")
         k_flat = einsum(in_features, self.wk, "... seq d_in, d_k d_in -> ... seq d_k")
         v_flat = einsum(in_features, self.wv, "... seq d_in, d_v d_in -> ... seq d_v")
 
-        # Split into heads using rearrange
+        # Split into heads
         q = rearrange(q_flat, "... seq (n_heads d_head) -> ... n_heads seq d_head", n_heads=self.num_heads)
         k = rearrange(k_flat, "... seq (n_heads d_head) -> ... n_heads seq d_head", n_heads=self.num_heads)
         v = rearrange(v_flat, "... seq (n_heads d_head) -> ... n_heads seq d_head", n_heads=self.num_heads)
@@ -62,7 +61,6 @@ class MultiheadSelfAttention(nn.Module):
             q = self.rope.forward(q, token_positions)
             k = self.rope.forward(k, token_positions)
 
-        # Apply attention
         mask = None
         if self.masked:
             seq_len = in_features.shape[-2]
