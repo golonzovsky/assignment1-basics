@@ -5,9 +5,10 @@ from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
 from jaxtyping import Float, Int
 
+from numpy import dtype
 import numpy.typing as npt
 import torch
-from torch import Tensor
+from torch import Tensor, device
 
 from cs336_basics.linear import Linear
 from cs336_basics.embedding import Embedding
@@ -16,6 +17,7 @@ from cs336_basics.rope import RotaryPositionalEmbedding
 from cs336_basics.softmax import softmax
 from cs336_basics.scaled_dot_product_attention import ScaledDotProductAttention
 from cs336_basics.multihead_self_attention import MultiheadSelfAttention
+from cs336_basics.transformer_block import TransformerBlock
 
 # from torch.nn import Linear
 
@@ -40,7 +42,7 @@ def run_linear(
     """
 
     layer = Linear(d_in, d_out)
-    layer.load_state_dict({"weights": weights})
+    layer.load_state_dict({"weight": weights})
     return layer.forward(in_features)
 
 
@@ -99,9 +101,9 @@ def run_swiglu(
     # swiglu.w3.weight.data = w3_weight
     #
     swiglu = SwiGLU(d_model, d_ff)
-    swiglu.w1.load_state_dict({"weights": w1_weight})
-    swiglu.w2.load_state_dict({"weights": w2_weight})
-    swiglu.w3.load_state_dict({"weights": w3_weight})
+    swiglu.w1.load_state_dict({"weight": w1_weight})
+    swiglu.w2.load_state_dict({"weight": w2_weight})
+    swiglu.w3.load_state_dict({"weight": w3_weight})
     return swiglu.forward(in_features)
 
 
@@ -157,7 +159,14 @@ def run_multihead_self_attention(
         implementation with the given QKV projection weights and input features.
     """
     layer = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads)
-    layer.load_state_dict({"wq": q_proj_weight, "wk": k_proj_weight, "wv": v_proj_weight, "wo": o_proj_weight})
+    layer.load_state_dict(
+        {
+            "q_proj.weight": q_proj_weight,
+            "k_proj.weight": k_proj_weight,
+            "v_proj.weight": v_proj_weight,
+            "output_proj.weight": o_proj_weight,
+        }
+    )
     return layer.forward(in_features=in_features)
 
 
@@ -201,7 +210,14 @@ def run_multihead_self_attention_with_rope(
     head_dim = d_model // num_heads
     rope = RotaryPositionalEmbedding(theta, head_dim, max_seq_len)
     layer = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads, rope_submodule=rope)
-    layer.load_state_dict({"wq": q_proj_weight, "wk": k_proj_weight, "wv": v_proj_weight, "wo": o_proj_weight})
+    layer.load_state_dict(
+        {
+            "q_proj.weight": q_proj_weight,
+            "k_proj.weight": k_proj_weight,
+            "v_proj.weight": v_proj_weight,
+            "output_proj.weight": o_proj_weight,
+        }
+    )
     return layer.forward(in_features=in_features, token_positions=token_positions)
 
 
@@ -299,7 +315,11 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    head_dim = d_model // num_heads
+    rope = RotaryPositionalEmbedding(theta, head_dim, max_seq_len)
+    layer = TransformerBlock(d_model, num_heads, d_ff, rope)
+    layer.load_state_dict(weights)
+    return layer.forward(in_features=in_features)
 
 
 def run_transformer_lm(
@@ -406,7 +426,7 @@ def run_rmsnorm(
     """
 
     layer = RMSNorm(d_model, eps)
-    layer.load_state_dict({"weights": weights})
+    layer.load_state_dict({"weight": weights})
     return layer.forward(in_features)
 
 

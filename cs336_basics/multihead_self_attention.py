@@ -29,27 +29,22 @@ class MultiheadSelfAttention(nn.Module):
         self.masked = masked
         self.rope = rope_submodule
 
-        self.initParam("wq")
-        self.initParam("wk")
-        self.initParam("wv")
-        self.initParam("wo")
+        self.q_proj = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.k_proj = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.v_proj = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.output_proj = Linear(d_model, d_model, device=device, dtype=dtype)
 
         self.attn = ScaledDotProductAttention()
 
-    def initParam(self, name: str):
-        w = torch.empty(self.d_model, self.d_model, device=self.device, dtype=self.dtype)
-        torch.nn.init.trunc_normal_(w)
-        # nn.init.xavier_uniform_(w)
-        self.register_parameter(name, nn.Parameter(w))
 
     def forward(
         self,
         in_features: Float[Tensor, " ... seq d_in"],
         token_positions: Int[Tensor, " ... sequence_length"] | None = None,
     ) -> Float[Tensor, " ... seq d_out"]:
-        q_flat = einsum(in_features, self.wq, "... seq d_in, d_q d_in -> ... seq d_q")
-        k_flat = einsum(in_features, self.wk, "... seq d_in, d_k d_in -> ... seq d_k")
-        v_flat = einsum(in_features, self.wv, "... seq d_in, d_v d_in -> ... seq d_v")
+        q_flat = self.q_proj(in_features)
+        k_flat = self.k_proj(in_features)
+        v_flat = self.v_proj(in_features)
 
         # Split into heads
         q = rearrange(q_flat, "... seq (n_heads d_head) -> ... n_heads seq d_head", n_heads=self.num_heads)
@@ -69,4 +64,4 @@ class MultiheadSelfAttention(nn.Module):
         attention_output = self.attn(q, k, v, mask)
         multihead = rearrange(attention_output, "... n_heads seq d_head -> ... seq (n_heads d_head)")
 
-        return einsum(multihead, self.wo, "... seq d_in, d_out d_in -> ... seq d_out")
+        return self.output_proj(multihead)
