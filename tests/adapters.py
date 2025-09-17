@@ -18,6 +18,7 @@ from cs336_basics.softmax import softmax
 from cs336_basics.scaled_dot_product_attention import ScaledDotProductAttention
 from cs336_basics.multihead_self_attention import MultiheadSelfAttention
 from cs336_basics.transformer_block import TransformerBlock
+from cs336_basics.transformer import Transformer
 
 # from torch.nn import Linear
 
@@ -401,7 +402,10 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+
+    layer = Transformer(vocab_size, context_length, d_model, num_layers, d_ff, num_heads, rope_theta)
+    layer.load_state_dict(weights)
+    return layer.forward(in_indices)
 
 
 def run_rmsnorm(
