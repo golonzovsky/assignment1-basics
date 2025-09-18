@@ -5,7 +5,7 @@ from torch import Tensor, device, dtype
 from einops import reduce
 
 
-def softmax(in_features: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
+def softmax(in_features: Float[Tensor, "..."], dim: int = -1) -> Float[Tensor, "..."]:
     max_vals = in_features.max(dim=dim, keepdim=True).values
     normalized = in_features - max_vals
     exp = torch.exp(normalized)
