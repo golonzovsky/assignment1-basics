@@ -4,9 +4,7 @@ import math
 
 
 class AdamW(torch.optim.Optimizer):
-    def __init__(self, params, weight_decay, lr=1e-3, b1=0.9, b2=0.999, eps=1e-8, betas=None):
-        if betas is None:
-            betas = (0.9, 0.999)
+    def __init__(self, params, weight_decay, lr=1e-3, eps=1e-8, betas=(0.9, 0.999)):
         if lr < 0:
             raise ValueError(f"invalid learning rate: {lr}")
         defaults = {"lr": lr, "betas": betas, "eps": eps, "weight_decay": weight_decay}
