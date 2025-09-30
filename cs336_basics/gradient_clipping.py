@@ -1,10 +1,6 @@
 import torch
 import math
-import torch.nn as nn
-from jaxtyping import Float
-from torch import Tensor, device, dtype
-from einops import reduce
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 
 
 def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float, eps=1e-6) -> None:
