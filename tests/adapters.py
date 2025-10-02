@@ -12,6 +12,7 @@ from torch import Tensor, device
 
 from cs336_basics.adamw_optimizer import AdamW
 from cs336_basics.cross_entropy import cross_entropy
+from cs336_basics.training import data_loader, load_checkpoint, save_checkpoint
 from cs336_basics.gradient_clipping import gradient_clipping
 from cs336_basics.linear import Linear
 from cs336_basics.embedding import Embedding
@@ -351,7 +352,7 @@ def run_transformer_lm(
         num_heads (int): Number of heads to use in multi-headed attention. `d_model` must be
             evenly divisible by `num_heads`.
         d_ff (int): Dimensionality of the feed-forward inner layer (section 3.3).
-        rope_theta (float): The RoPE $\Theta$ parameter.
+        rope_theta (float): The RoPE Theta parameter.
         weights (dict[str, Tensor]):
             State dict of our reference implementation. {num_layers} refers to an
             integer between `0` and `num_layers - 1` (the layer index).
@@ -472,7 +473,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return data_loader(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -571,7 +572,7 @@ def run_save_checkpoint(
         iteration (int): Serialize this value, which represents the number of training iterations
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    save_checkpoint(model, optimizer, iteration, out)
 
 
 def run_load_checkpoint(
@@ -592,7 +593,7 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return load_checkpoint(src, model, optimizer)
 
 
 from cs336_basics.swiglu import SwiGLU
