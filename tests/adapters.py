@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import os
-from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
-from jaxtyping import Float, Int
+from typing import IO, Any, BinaryIO
 
-from numpy import dtype
 import numpy.typing as npt
 import torch
+from jaxtyping import Bool, Float, Int
 from torch import Tensor, device
 
 from cs336_basics.adamw_optimizer import AdamW
@@ -26,7 +25,6 @@ from cs336_basics.transformer_block import TransformerBlock
 from cs336_basics.transformer import Transformer
 
 # from torch.nn import Linear
-
 
 def run_linear(
     d_in: int,
@@ -117,7 +115,7 @@ def run_scaled_dot_product_attention(
     Q: Float[Tensor, " ... queries d_k"],
     K: Float[Tensor, " ... keys d_k"],
     V: Float[Tensor, " ... values d_v"],
-    mask: Float[Tensor, " ... queries keys"] | None = None,
+    mask: Bool[Tensor, " ... queries keys"] | None = None,
 ) -> Float[Tensor, " ... queries d_v"]:
     """
     Given key (K), query (Q), and value (V) tensors, return
@@ -127,7 +125,7 @@ def run_scaled_dot_product_attention(
         Q (Float[Tensor, " ... queries d_k"]): Query tensor
         K (Float[Tensor, " ... keys d_k"]): Key tensor
         V (Float[Tensor, " ... values d_v"]): Values tensor
-        mask (Float[Tensor, " ... queries keys"] | None): Mask tensor
+        mask (Bool[Tensor, " ... queries keys"] | None): Mask tensor
     Returns:
     """
     return ScaledDotProductAttention().forward(Q, K, V, mask=mask)
@@ -352,7 +350,7 @@ def run_transformer_lm(
         num_heads (int): Number of heads to use in multi-headed attention. `d_model` must be
             evenly divisible by `num_heads`.
         d_ff (int): Dimensionality of the feed-forward inner layer (section 3.3).
-        rope_theta (float): The RoPE Theta parameter.
+        rope_theta (float): The RoPE $\Theta$ parameter.
         weights (dict[str, Tensor]):
             State dict of our reference implementation. {num_layers} refers to an
             integer between `0` and `num_layers - 1` (the layer index).
@@ -522,7 +520,7 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
     return gradient_clipping(parameters, max_l2_norm)
 
 
-def get_adamw_cls() -> type[torch.optim.Optimizer]:
+def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
@@ -579,7 +577,7 @@ def run_load_checkpoint(
     src: str | os.PathLike | BinaryIO | IO[bytes],
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
-):
+) -> int:
     """
     Given a serialized checkpoint (path or file-like object), restore the
     serialized state to the given model and optimizer.
