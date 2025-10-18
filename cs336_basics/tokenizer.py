@@ -1,6 +1,8 @@
 import os
+import json
 from collections import Counter
 from collections.abc import Iterable, Iterator
+from tests.common import gpt2_bytes_to_unicode
 
 import regex as re
 
@@ -134,8 +136,35 @@ class Tokenizer:
         self.tok2id = {b: i for i, b in vocab.items()}
         self.merges = merges
 
-    def from_files(self, vocab_filepath: str, merges_filepath: str, special_tokens: list[str] | None = None):
-        raise NotImplementedError
+    @classmethod
+    def from_files(cls, vocab_filepath: str, merges_filepath: str, special_tokens: list[str] | None = None):
+        # GPT-2 bytes to unicode mapping (for decoding)
+        gpt2_byte_decoder = {v: k for k, v in gpt2_bytes_to_unicode().items()}
+
+        # Load vocab
+        with open(vocab_filepath, 'r', encoding='utf-8') as f:
+            vocab_json = json.load(f)
+
+        # Convert vocab from GPT-2 unicode format to bytes
+        vocab = {}
+        for idx_str, gpt2_str in vocab_json.items():
+            idx = int(idx_str)
+            byte_list = [gpt2_byte_decoder[char] for char in gpt2_str]
+            vocab[idx] = bytes(byte_list)
+
+        # Load merges
+        merges = []
+        with open(merges_filepath, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or len(line.split()) != 2:
+                    continue
+                a_str, b_str = line.split()
+                a_bytes = bytes([gpt2_byte_decoder[char] for char in a_str])
+                b_bytes = bytes([gpt2_byte_decoder[char] for char in b_str])
+                merges.append((a_bytes, b_bytes))
+
+        return cls(vocab=vocab, merges=merges, special_tokens=special_tokens)
 
     def encode(self, text: str) -> list[int]:
         return list(self.encode_iterable([text]))
