@@ -1,12 +1,7 @@
-from math import sqrt
-import torch
 import torch.nn as nn
 from jaxtyping import Float, Int
-from torch import Tensor, device, dtype, mul
-from einops import reduce, einsum, rearrange, repeat
+from torch import Tensor, device, dtype
 
-from cs336_basics.scaled_dot_product_attention import ScaledDotProductAttention
-from cs336_basics.multihead_self_attention import MultiheadSelfAttention
 from cs336_basics.rope import RotaryPositionalEmbedding
 from cs336_basics.embedding import Embedding
 from cs336_basics.transformer_block import TransformerBlock
